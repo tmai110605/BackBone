@@ -150,8 +150,8 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
             loss.backward()
             optimizer.step()
     
-        if (n_batch % 10) == 0:
-            print('[{}]  epoch {}/{},  batch {}/{},  loss_{}={:.5f},  acc_{}={:.2f}%'.format('train' if train else ' val ', n_epoch + 1, args.epochs, n_batch + 1, batch_count, "train" if train else "val", loss_item, "train" if train else "val", 100.0 * acc))
+        #if (n_batch % 10) == 0:
+        #   print('[{}]  epoch {}/{},  batch {}/{},  loss_{}={:.5f},  acc_{}={:.2f}%'.format('train' if train else ' val ', n_epoch + 1, args.epochs, n_batch + 1, batch_count, "train" if train else "val", loss_item, "train" if train else "val", 100.0 * acc))
     
     return (sum(losses) / len(losses), sum(accs) / len(accs))
             
@@ -169,8 +169,8 @@ def main():
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)     
     
-    #arr_typesize = ['large', 'small']
-    arr_typesize = ['small']
+    arr_typesize = ['large', 'small']
+    #arr_typesize = ['small']
     for typesize in arr_typesize:    
         strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'  
         pathout = './checkpoints/' + strmode
@@ -182,7 +182,8 @@ def main():
         model = build_TickNet(120, typesize=typesize, cifar=False)                
         model = model.to(device)
         
-        print(model)
+        
+        #print(model)
         
         print('Number of model parameters: {}'.format(
         sum([p.data.nelement() for p in model.parameters()])))
