@@ -170,7 +170,7 @@ def main():
     torch.autograd.set_detect_anomaly(True)     
     
     #arr_typesize = ['large', 'small']
-    arr_typesize = ['small']
+    arr_typesize = ['large']
     for typesize in arr_typesize:    
         strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'  
         pathout = './checkpoints/' + strmode
