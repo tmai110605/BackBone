@@ -169,7 +169,7 @@ def main():
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)             
     #arr_typesize_groups = [2,1,4]
-    arr_typesize_groups = [1]
+    arr_typesize_groups = [2]
     
     for typesize in arr_typesize_groups:    
         strmode = 'NetTOP_groups_' + str(typesize)
