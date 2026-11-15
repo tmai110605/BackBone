@@ -37,8 +37,10 @@ def get_args():
     parser.add_argument('--download', action='store_true',
                         help='Download the specified dataset before running the training.')
     # parser.add_argument('-a', '--architecture', type=str, required=True, help='Model architecture name.')
-    parser.add_argument('-a', '--architecture', type=str, default='mobilenetv1_w1', help='Model architecture name.')
-    parser.add_argument('-g', '--gpu-id', default=1, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
+    parser.add_argument('--width-multiplier', type=float, default=1.0, choices=[1.0, 0.75, 0.5, 0.25], help='Model width multiplier (1.0 is standard proposed).')
+    parser.add_argument('--groups', type=int, default=1, choices=[1, 2, 4], help='Group count (g=1 is standard proposed, g=2 is lightweight).')
+    parser.add_argument('--all-sizes', action='store_true', help='Run sequentially over all width multipliers [1.0, 0.75, 0.5, 0.25].')
+    parser.add_argument('-g', '--gpu-id', default=0, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
     parser.add_argument('-j', '--workers', default=4, type=int, help='Number of data loading workers.')
     parser.add_argument('-b', '--batch-size', default=128, type=int, help='Batch size.')
     parser.add_argument('-e', '--epochs', default=200, type=int, help='Number of total epochs to run.')
@@ -177,18 +179,15 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    args.gpu_id = 0
     device = get_device(args)
     print('Using device {}'.format(device))
 
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)
-    arr_size = [1.0, 0.75, 0.5, 0.25]
+    arr_size = [1.0, 0.75, 0.5, 0.25] if args.all_sizes else [args.width_multiplier]
     
     for sizem in arr_size:
-        #arr_typesize_groups = [1,2,4]
-        #arr_typesize_groups = [2, 4]
-        arr_typesize_groups = [1]
+        arr_typesize_groups = [args.groups]
         for typesize in arr_typesize_groups:
             strmode = 'DenSpaNet_groups_' + '_' + str(sizem) + '_' + str(typesize)
             #strmode = 'MDFNet_final_2_groups_for_test_all_5x5_d123_' + '_' + str(sizem) + '_' + str(typesize)            

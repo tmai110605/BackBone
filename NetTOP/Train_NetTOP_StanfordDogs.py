@@ -29,7 +29,8 @@ def get_args():
     #parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
     parser.add_argument('-d', '--dataset', type=str, choices=['cifar10', 'cifar100', 'dogs'], default='dogs', help='Dataset name.')
     parser.add_argument('--download', action='store_true', help='Download the specified dataset before running the training.')    
-    parser.add_argument('-g', '--gpu-id', default=1, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
+    parser.add_argument('--groups', default=1, type=int, choices=[1, 2, 4], help='Number of groups in TOP blocks (g=1 is standard proposed, g=2 is lightweight).')
+    parser.add_argument('-g', '--gpu-id', default=0, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
     parser.add_argument('-j', '--workers', default=4, type=int, help='Number of data loading workers.')
     parser.add_argument('-b', '--batch-size', default=64, type=int, help='Batch size.')        
     parser.add_argument('-e', '--epochs', default=200, type=int, help='Number of total epochs to run.')
@@ -63,6 +64,7 @@ def get_data_loader(args, train):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
+                
             ])
         else:
             transform = torchvision.transforms.Compose([
@@ -162,22 +164,32 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    args.gpu_id = 0
     device = get_device(args)
     print('Using device {}'.format(device))
     
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)             
-    #arr_typesize_groups = [2,1,4]
-    arr_typesize_groups = [2]
+    
+    is_cifar = args.dataset in ('cifar10', 'cifar100')
+    if args.dataset == 'cifar10':
+        num_classes = 10
+    elif args.dataset == 'cifar100':
+        num_classes = 100
+    else:
+        num_classes = 120
+
+    dataset_prefix = 'CIFAR100' if args.dataset == 'cifar100' else ('CIFAR10' if args.dataset == 'cifar10' else 'StanfordDogs')
+    arr_typesize_groups = [args.groups]
     
     for typesize in arr_typesize_groups:    
-        strmode = 'NetTOP_groups_' + str(typesize)
-        pathout = './checkpoints/StanfordDogs_NetTOP/' + strmode
+        strmode = f'{dataset_prefix}_NetTOP_groups_' + str(typesize)
+        pathout = f'./checkpoints/{dataset_prefix}_NetTOP/' + strmode
         filenameLOG = pathout + '/' + strmode + '.txt'
+        if not os.path.exists(pathout):
+            os.makedirs(pathout)
         
         # get model        
-        model = build_NetTOP(120, cifar=False,groups=typesize)
+        model = build_NetTOP(num_classes, cifar=is_cifar, groups=typesize)
         model = model.to(device)
         
         print(model)
@@ -195,7 +207,7 @@ def main():
         train_loader = get_data_loader(args=args, train=True)
         val_loader = get_data_loader(args=args, train=False)
         if args.evaluate:
-            pathcheckpoint = "./checkpoints/StanfordDogs/checkpoint_120_6528.pth"
+            pathcheckpoint = "./checkpoints/StanfordDogs_NetTOP/NetTOP_groups_1/checkpoint_epoch0147_65.64.pth"
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
                 checkpoint = torch.load(pathcheckpoint)

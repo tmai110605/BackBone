@@ -30,8 +30,8 @@ def get_args():
     #parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
     parser.add_argument('-d', '--dataset', type=str, choices=['cifar10', 'cifar100', 'dogs'], default='dogs', help='Dataset name.')
     parser.add_argument('--download', action='store_true', help='Download the specified dataset before running the training.')
-    #parser.add_argument('-a', '--architecture', type=str, required=True, help='Model architecture name.')    
-    parser.add_argument('-g', '--gpu-id', default=1, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
+    parser.add_argument('-a', '--typesize', default=1.0, type=float, choices=[1.0, 0.75, 0.5], help='Model scale multiplier (1.0 is standard CaretNetx1.0).')
+    parser.add_argument('-g', '--gpu-id', default=0, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
     parser.add_argument('-j', '--workers', default=4, type=int, help='Number of data loading workers.')
     parser.add_argument('-b', '--batch-size', default=64, type=int, help='Batch size.')        
     parser.add_argument('-e', '--epochs', default=200, type=int, help='Number of total epochs to run.')
@@ -66,6 +66,7 @@ def get_data_loader(args, train):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
+                
             ])
         else:
             transform = torchvision.transforms.Compose([
@@ -169,21 +170,30 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    args.gpu_id = 0
     device = get_device(args)
     print('Using device {}'.format(device))
     
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)     
     
-    strmode = 'StanfordDogs_CaretNet'
+    is_cifar = args.dataset in ('cifar10', 'cifar100')
+    if args.dataset == 'cifar10':
+        num_classes = 10
+    elif args.dataset == 'cifar100':
+        num_classes = 100
+    else:
+        num_classes = 120
+
+    dataset_prefix = 'CIFAR100' if args.dataset == 'cifar100' else ('CIFAR10' if args.dataset == 'cifar10' else 'StanfordDogs')
+    typesize = args.typesize
+    strmode = f'{dataset_prefix}_CaretNet_x{typesize}'
     pathout = './checkpoints/' + strmode
     filenameLOG = pathout + '/' + strmode + '.txt'
     if not os.path.exists(pathout):
         os.makedirs(pathout)
     # get model
      
-    model = build_CaretNet(120, typesize=1, cifar=False)
+    model = build_CaretNet(num_classes, typesize=typesize, cifar=is_cifar)
     model = model.to(device)
     
     print(model)
