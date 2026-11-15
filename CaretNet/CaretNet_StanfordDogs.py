@@ -158,8 +158,9 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
             loss.backward()
             optimizer.step()
     
-        if (n_batch % 10) == 0:
-            print('[{}]  epoch {}/{},  batch {}/{},  loss_{}={:.5f},  acc_{}={:.2f}%'.format('train' if train else ' val ', n_epoch + 1, args.epochs, n_batch + 1, batch_count, "train" if train else "val", loss_item, "train" if train else "val", 100.0 * acc))
+        #if (n_batch % 10) == 0:
+        
+        #    print('[{}]  epoch {}/{},  batch {}/{},  loss_{}={:.5f},  acc_{}={:.2f}%'.format('train' if train else ' val ', n_epoch + 1, args.epochs, n_batch + 1, batch_count, "train" if train else "val", loss_item, "train" if train else "val", 100.0 * acc))
     
     return (sum(losses) / len(losses), sum(accs) / len(accs))
             
@@ -196,7 +197,7 @@ def main():
     model = build_CaretNet(num_classes, typesize=typesize, cifar=is_cifar)
     model = model.to(device)
     
-    print(model)
+    #print(model)
     
     print('Number of model parameters: {}'.format(
     sum([p.data.nelement() for p in model.parameters()])))
