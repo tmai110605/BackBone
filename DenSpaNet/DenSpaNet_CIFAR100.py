@@ -49,6 +49,10 @@ def get_args():
                         help='Learning rate schedule (epochs after which the learning rate should be dropped).')
     parser.add_argument('-m', '--momentum', default=0.9, type=float, help='SGD momentum.')
     parser.add_argument('-w', '--weight-decay', default=1e-4, type=float, help='SGD weight decay.')
+    parser.add_argument('--group-threshold', '-th', default=192, type=int,
+                        help='Channel threshold to apply group convolution (e.g. 64, 128, 192, 256, 512, or 0 for baseline).')
+    parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
+    parser.add_argument('--checkpoint-path', type=str, default='', help='Path to checkpoint file for evaluation.')
     # parser.add_argument('--alpha', default=0.1, type=float, help='BSConv-S weighting coefficient for the regularization loss.')
     return parser.parse_args()
 
@@ -74,7 +78,7 @@ def get_data_loader(args, train):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), value='random')
+                
             ])
         else:
             transform = torchvision.transforms.Compose([
@@ -187,50 +191,27 @@ def main():
     torch.autograd.set_detect_anomaly(True)
     arr_size = [1.0, 0.75, 0.5, 0.25] if args.all_sizes else [args.width_multiplier]
     
+    th_str = f"th{args.group_threshold}" if args.group_threshold > 0 else "baseline"
     for sizem in arr_size:
         arr_typesize_groups = [args.groups]
         for typesize in arr_typesize_groups:
-            strmode = 'DenSpaNet_groups_' + '_' + str(sizem) + '_' + str(typesize)
-            #strmode = 'MDFNet_final_2_groups_for_test_all_5x5_d123_' + '_' + str(sizem) + '_' + str(typesize)            
-            pathout = './checkpoints/CIFAR100_DenSpaNet/' + strmode
+            strmode = f'CIFAR100_DenSpaNet_w{sizem}_g{typesize}_{th_str}'
+            pathout = './checkpoints/' + strmode
             filenameLOG = pathout + '/' + strmode + '.txt'
             if not os.path.exists(pathout):
                 os.makedirs(pathout)
             # get model
 
-            model = build_DenSpaNet(100, sizem, cifar=True, groups=typesize)
+            model = build_DenSpaNet(100, sizem, cifar=True, groups=typesize, group_threshold=args.group_threshold)
             model = model.to(device)
 
-            #print(model)
+            print(model)
 
             print('Number of model parameters: {}'.format(
                 sum([p.data.nelement() for p in model.parameters()])))
             
-            # file_log_model = pathout + '/' + strmode + '_modelLog.txt'
-            # with open(file_log_model, 'w') as f:
-            #     f.write(str(model))
-            #     f.write('\n')
-            #     f.write('Number of model parameters: {}'.format(
-            #     sum([p.data.nelement() for p in model.parameters()])))
-            #     f.write('\n')
-            
-            #     macs, params = get_model_complexity_info(model, (3, 32, 32), as_strings=True,
-            #                                     print_per_layer_stat=True, verbose=True, flops_units='GMac',
-            #                                     param_units='M')
-            #     # print_per_layer_stat=True, verbose=True,param_units='M')
-
-            #     # , flops_units='GMac')
-            #     macs1 = macs.split()
-            #     strmacs1 = str(float(macs1[0]) / 2) + ' ' + macs1[1][0]
-                
-            #     f.write('{:<30}  {:<8}'.format('Floating-point operations (FLOPs): ', strmacs1))
-            #     f.write('\n')
-            #     f.write('{:<30}  {:<8}'.format('Number of parameters using ptflops: ', params))
-            #     f.write('\n')
-            
             # define loss function and optimizer
             train_loss_fn = LabelSmoothingCrossEntropy(smoothing=0.1).to(device)
-            # validate_loss_fn = nn.CrossEntropyLoss().to(device)
             criterion = torch.nn.CrossEntropyLoss().to(device)
             optimizer = torch.optim.SGD(params=model.parameters(), lr=args.learning_rate, momentum=args.momentum,
                                         weight_decay=args.weight_decay)
@@ -239,6 +220,24 @@ def main():
             # get train and val data loaders
             train_loader = get_data_loader(args=args, train=True)
             val_loader = get_data_loader(args=args, train=False)
+
+            if args.evaluate:
+                default_ckpt = f"./checkpoints/{strmode}/model_best.pth"
+                pathcheckpoint = args.checkpoint_path if args.checkpoint_path else default_ckpt
+                if os.path.isfile(pathcheckpoint):
+                    print("=> loading checkpoint '{}'".format(pathcheckpoint))
+                    checkpoint = torch.load(pathcheckpoint, map_location=device)
+                    model.load_state_dict(checkpoint['model_state_dict'])
+                    del checkpoint
+                else:
+                    print("=> no checkpoint found at '{}'".format(pathcheckpoint))
+                    return
+                m = time.time()
+                (loss_val, acc_val) = run_epoch(train=False, data_loader=val_loader, model=model, criterion=criterion, optimizer=None, n_epoch=0, args=args, device=device)
+                print('[{}], loss_{}={:.5f},  acc_{}={:.5f}%'.format(' validating: ', "val", loss_val, "val", 100.0 * acc_val))
+                n = time.time()
+                print('Validation time: {:.4f} hours ({:.2f} s)'.format((n - m) / 3600, n - m))
+                return
 
             # for each epoch...
             acc_val_max = None

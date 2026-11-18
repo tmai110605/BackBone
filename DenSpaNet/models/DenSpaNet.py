@@ -15,10 +15,10 @@ class DenSpa(torch.nn.Module):
     def __init__(self,
                  in_channels,
                  out_channels,
-                 stride, groups=1):
+                 stride, groups=1, group_threshold=192):
         super().__init__()
         self.groups = groups
-        groups_pw1 = 2 if (in_channels >= 192 and in_channels % 2 == 0) else 1
+        groups_pw1 = 2 if (group_threshold > 0 and in_channels >= group_threshold and in_channels % 2 == 0) else 1
         self.Pw1 = conv1x1_group_block(in_channels=in_channels,
                         out_channels=in_channels,
                         use_bn=False,
@@ -78,7 +78,7 @@ class DenSpaNet(torch.nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True, groups=2):
+                 use_data_batchnorm=True, groups=2, group_threshold=192):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
@@ -99,7 +99,7 @@ class DenSpaNet(torch.nn.Module):
             for unit_id, unit_channels in enumerate(stage_channels):
                 stride = strides[stage_id] if unit_id == 0 else 1
                 stage.add_module("unit{}".format(unit_id + 1),
-                                 DenSpa(in_channels=in_channels, out_channels=unit_channels, stride=stride, groups=groups))
+                                 DenSpa(in_channels=in_channels, out_channels=unit_channels, stride=stride, groups=groups, group_threshold=group_threshold))
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         
@@ -143,7 +143,7 @@ class DenSpaNet(torch.nn.Module):
         return x
 
 
-def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1):
+def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1, group_threshold=192):
     init_conv_channels = 32    
     channels = [[64], [64, 128], [128, 256,256], [256, 256, 512], [512]]    
 
@@ -166,4 +166,5 @@ def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1):
                   init_conv_stride=init_conv_stride,
                   channels=channels,
                   strides=strides,
-                  in_size=in_size, groups=groups)
+                  in_size=in_size, groups=groups,
+                  group_threshold=group_threshold)

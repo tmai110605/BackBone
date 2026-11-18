@@ -38,8 +38,11 @@ def get_args():
     parser.add_argument('-s', '--schedule', nargs='+', default=[100, 150, 180], type=int, help='Learning rate schedule (epochs after which the learning rate should be dropped).')    
     parser.add_argument('-m', '--momentum', default=0.9, type=float, help='SGD momentum.')
     parser.add_argument('-w', '--weight-decay', default=1e-4, type=float, help='SGD weight decay.')    
+    parser.add_argument('--group-threshold', '-th', default=192, type=int,
+                        help='Channel threshold to apply group convolution (e.g. 64, 128, 192, 256, 512, or 0 for baseline).')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
+    parser.add_argument('--checkpoint-path', type=str, default='', help='Path to checkpoint file for evaluation.')
     return parser.parse_args()
 
 
@@ -179,19 +182,19 @@ def main():
 
     dataset_prefix = 'CIFAR100' if args.dataset == 'cifar100' else ('CIFAR10' if args.dataset == 'cifar10' else 'StanfordDogs')
     arr_typesize = [args.architecture]
+    th_str = f"th{args.group_threshold}" if args.group_threshold > 0 else "baseline"
     for typesize in arr_typesize:    
-        strmode = f'{dataset_prefix}_TickNet_{typesize}_SE'  
+        strmode = f'{dataset_prefix}_TickNet_{typesize}_{th_str}'  
         pathout = './checkpoints/' + strmode
         filenameLOG = pathout + '/' + strmode + '.txt'
         if not os.path.exists(pathout):
             os.makedirs(pathout)
         # get model
         
-        model = build_TickNet(num_classes, typesize=typesize, cifar=is_cifar)                
+        model = build_TickNet(num_classes, typesize=typesize, cifar=is_cifar, group_threshold=args.group_threshold)                
         model = model.to(device)
         
-        
-        #print(model)
+        print(model)
         
         print('Number of model parameters: {}'.format(
         sum([p.data.nelement() for p in model.parameters()])))
@@ -207,10 +210,11 @@ def main():
         val_loader = get_data_loader(args=args, train=False)
         
         if args.evaluate:
-            pathcheckpoint = "./checkpoints/StanfordDogs/small/model_best.pth"
+            default_ckpt = f"./checkpoints/{strmode}/model_best.pth"
+            pathcheckpoint = args.checkpoint_path if args.checkpoint_path else default_ckpt
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
-                checkpoint = torch.load(pathcheckpoint)
+                checkpoint = torch.load(pathcheckpoint, map_location=device)
                 model.load_state_dict(checkpoint['model_state_dict'])                
                 del checkpoint
             else:

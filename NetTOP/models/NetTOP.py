@@ -32,11 +32,11 @@ class ConvPlane(torch.nn.Module):
             x = self.dw(x)
         return x
 class Conv3P(torch.nn.Module):    
-    def __init__(self, in_channels, stride=1,Temporal=True,groups=2,in_size=(224, 224)):
+    def __init__(self, in_channels, stride=1,Temporal=True,groups=2,in_size=(224, 224), group_threshold=192):
         super().__init__()
         self.in_size = in_size
         self.stride = stride        
-        groups_pw1 = 2 if (in_channels >= 192 and in_channels % 2 == 0) else 1
+        groups_pw1 = 2 if (group_threshold > 0 and in_channels >= group_threshold and in_channels % 2 == 0) else 1
         self.spatial = ConvPlane(in_channels,stride=stride,Temporal=False,groups=groups_pw1)
         if in_size == (32, 32):#32x32 for CIFAR10/100
             self.ConvPlane_32 = ConvPlane(32,stride=stride,groups=groups)
@@ -91,12 +91,12 @@ class Conv3P(torch.nn.Module):
 class TOP_Block(torch.nn.Module):
     """    
     """
-    def __init__(self, in_channels, out_channels, stride, groups=2, in_size=(224, 224)):
+    def __init__(self, in_channels, out_channels, stride, groups=2, in_size=(224, 224), group_threshold=192):
         super().__init__()
         #PwOut
         self.pw2 = conv1x1_group_block(in_channels=in_channels,
                                         out_channels=out_channels,groups=groups)
-        self.Conv3P = Conv3P(in_channels, stride=stride,Temporal=True,groups=groups,in_size=in_size)
+        self.Conv3P = Conv3P(in_channels, stride=stride,Temporal=True,groups=groups,in_size=in_size, group_threshold=group_threshold)
         self.in_channels = in_channels
         self.out_channels = out_channels
         if stride == 2 or self.in_channels != self.out_channels:
@@ -127,7 +127,8 @@ class NetTOP(torch.nn.Module):
                  in_channels=3,
                  in_size=(224, 224),
                  use_data_batchnorm=True,
-                 groups=2):
+                 groups=2,
+                 group_threshold=192):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
@@ -147,7 +148,7 @@ class NetTOP(torch.nn.Module):
             stage = torch.nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
                 stride = strides[stage_id] if unit_id == 0 else 1
-                stage.add_module("unit{}".format(unit_id + 1), TOP_Block(in_channels=in_channels, out_channels=unit_channels, stride=stride,in_size=in_size,groups=groups))
+                stage.add_module("unit{}".format(unit_id + 1), TOP_Block(in_channels=in_channels, out_channels=unit_channels, stride=stride,in_size=in_size,groups=groups, group_threshold=group_threshold))
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)                
         self.final_conv_channels = 1024
@@ -181,7 +182,7 @@ class NetTOP(torch.nn.Module):
         x = self.classifier(x)
         return x
     
-def build_NetTOP(num_classes, cifar=False,groups=2):
+def build_NetTOP(num_classes, cifar=False,groups=2, group_threshold=192):
     init_conv_channels = 32
     channels = [[64], [64, 128,128], [256,256,256], [512, 512, 512], [512]]
 
@@ -199,4 +200,5 @@ def build_NetTOP(num_classes, cifar=False,groups=2):
                        init_conv_stride=init_conv_stride,
                        channels=channels,
                        strides=strides,
-                       in_size=in_size,groups=groups)
+                       in_size=in_size,groups=groups,
+                       group_threshold=group_threshold)

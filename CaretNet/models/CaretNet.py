@@ -13,9 +13,9 @@ class MRCFblock(torch.nn.Module):#interleave tensors
     def __init__(self,
                  in_channels,
                  out_channels,
-                 stride,init_status):
+                 stride,init_status, group_threshold=192):
         super().__init__()
-        groups_pw1 = 2 if (in_channels >= 192 and in_channels % 2 == 0) else 1
+        groups_pw1 = 2 if (group_threshold > 0 and in_channels >= group_threshold and in_channels % 2 == 0) else 1
         self.pw_in = conv1x1_block(in_channels=in_channels,
                                 out_channels=in_channels, groups=groups_pw1, use_bn=False, activation=None)
         self.pw_grouped = conv1x1_block(in_channels=2*in_channels,
@@ -69,7 +69,8 @@ class CaretNet(torch.nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True):
+                 use_data_batchnorm=True,
+                 group_threshold=192):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
@@ -90,7 +91,7 @@ class CaretNet(torch.nn.Module):
             stage = torch.nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
                 stride = strides[stage_id] if unit_id == 0 else 1                
-                stage.add_module("unit{}".format(unit_id + 1), MRCFblock(in_channels=in_channels, out_channels=unit_channels, stride=stride,init_status=init_status))
+                stage.add_module("unit{}".format(unit_id + 1), MRCFblock(in_channels=in_channels, out_channels=unit_channels, stride=stride,init_status=init_status, group_threshold=group_threshold))
                 init_status = False
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
@@ -130,7 +131,7 @@ class CaretNet(torch.nn.Module):
         x = self.backbone(x)
         x = self.classifier(x)
         return x
-def build_CaretNet(num_classes, typesize=1.0, cifar=False):
+def build_CaretNet(num_classes, typesize=1.0, cifar=False, group_threshold=192):
     """
     Construct a CaretNet from the given set of parameters.   
     Args:
@@ -160,4 +161,5 @@ def build_CaretNet(num_classes, typesize=1.0, cifar=False):
                        init_conv_stride=init_conv_stride,
                        channels=channels,
                        strides=strides,
-                       in_size=in_size)
+                       in_size=in_size,
+                       group_threshold=group_threshold)
