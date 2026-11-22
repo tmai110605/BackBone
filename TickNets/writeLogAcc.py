@@ -17,4 +17,4 @@ def writeLogAcc(filename='LogAcc1.txt', strtext=''):
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     strtext = dt_string + ' ' + strtext + '\n'
     file1.writelines(strtext)
-    file1.close() #to change file access modes
+    file1.close() #tochange file access modes
