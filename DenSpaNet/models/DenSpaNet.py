@@ -15,10 +15,10 @@ class DenSpa(torch.nn.Module):
     def __init__(self,
                  in_channels,
                  out_channels,
-                 stride, groups=1, group_threshold=192):
+                 stride, groups=1, group_threshold=192, group_count=2, group_pw2=False):
         super().__init__()
         self.groups = groups
-        groups_pw1 = 2 if (group_threshold > 0 and in_channels >= group_threshold and in_channels % 2 == 0) else 1
+        groups_pw1 = group_count if (group_threshold > 0 and in_channels >= group_threshold and in_channels % group_count == 0) else 1
         self.Pw1 = conv1x1_group_block(in_channels=in_channels,
                         out_channels=in_channels,
                         use_bn=False,
@@ -27,8 +27,12 @@ class DenSpa(torch.nn.Module):
         self.dw1 = conv3x3_dw_dilation_block(channels=in_channels, stride=stride,dilation=1,activation=None)        
         self.dw2 = conv5x5_dw_dilation_block(channels=in_channels, stride=stride,dilation=2)
         self.dw3 = conv5x5_dw_dilation_block(channels=in_channels, stride=stride,dilation=3)        
+        if group_pw2 and group_threshold > 0 and in_channels >= group_threshold and in_channels % group_count == 0 and out_channels % group_count == 0:
+            groups_pw2 = group_count
+        else:
+            groups_pw2 = groups
         self.Pw2 = conv1x1_group_block(in_channels=in_channels,
-                                        out_channels=out_channels,groups=groups)
+                                        out_channels=out_channels,groups=groups_pw2)
         
         if stride == 2 or in_channels != out_channels: 
             self.PwRes = conv1x1_block(in_channels=in_channels,
@@ -78,7 +82,7 @@ class DenSpaNet(torch.nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True, groups=2, group_threshold=192):
+                 use_data_batchnorm=True, groups=2, group_threshold=192, group_count=2, group_pw2=False):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
@@ -99,7 +103,7 @@ class DenSpaNet(torch.nn.Module):
             for unit_id, unit_channels in enumerate(stage_channels):
                 stride = strides[stage_id] if unit_id == 0 else 1
                 stage.add_module("unit{}".format(unit_id + 1),
-                                 DenSpa(in_channels=in_channels, out_channels=unit_channels, stride=stride, groups=groups, group_threshold=group_threshold))
+                                 DenSpa(in_channels=in_channels, out_channels=unit_channels, stride=stride, groups=groups, group_threshold=group_threshold, group_count=group_count, group_pw2=group_pw2))
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         
@@ -143,7 +147,7 @@ class DenSpaNet(torch.nn.Module):
         return x
 
 
-def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1, group_threshold=192):
+def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1, group_threshold=192, group_count=2, group_pw2=False):
     init_conv_channels = 32    
     channels = [[64], [64, 128], [128, 256,256], [256, 256, 512], [512]]    
 
@@ -167,4 +171,6 @@ def build_DenSpaNet(num_classes, width_multiplier=1.0, cifar=False, groups=1, gr
                   channels=channels,
                   strides=strides,
                   in_size=in_size, groups=groups,
-                  group_threshold=group_threshold)
+                  group_threshold=group_threshold,
+                  group_count=group_count,
+                  group_pw2=group_pw2)

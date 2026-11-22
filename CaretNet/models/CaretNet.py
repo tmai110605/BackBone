@@ -13,9 +13,9 @@ class MRCFblock(torch.nn.Module):#interleave tensors
     def __init__(self,
                  in_channels,
                  out_channels,
-                 stride,init_status, group_threshold=192):
+                 stride,init_status, group_threshold=192, group_count=2, group_pw2=False):
         super().__init__()
-        groups_pw1 = 2 if (group_threshold > 0 and in_channels >= group_threshold and in_channels % 2 == 0) else 1
+        groups_pw1 = group_count if (group_threshold > 0 and in_channels >= group_threshold and in_channels % group_count == 0) else 1
         self.pw_in = conv1x1_block(in_channels=in_channels,
                                 out_channels=in_channels, groups=groups_pw1, use_bn=False, activation=None)
         self.pw_grouped = conv1x1_block(in_channels=2*in_channels,
@@ -23,7 +23,11 @@ class MRCFblock(torch.nn.Module):#interleave tensors
                                 activation=None, groups=in_channels)
         self.dw_3x3 = conv3x3_dw_blockAll(channels=in_channels, stride=stride)
         self.dw_dilated_3x3 = conv3x3_dw_blockAll(channels=in_channels, stride=stride,padding=2,dilation=2)        
-        self.pw_out = conv1x1_block(in_channels=in_channels, out_channels=out_channels)        
+        if group_pw2 and group_threshold > 0 and in_channels >= group_threshold and in_channels % group_count == 0 and out_channels % group_count == 0:
+            groups_pw2 = group_count
+        else:
+            groups_pw2 = 1
+        self.pw_out = conv1x1_block(in_channels=in_channels, out_channels=out_channels, groups=groups_pw2)        
         if init_status == True or in_channels < out_channels:
             self.pw_residual = conv1x1_block(in_channels=in_channels,
                                     out_channels=out_channels, stride=stride)           
@@ -70,7 +74,9 @@ class CaretNet(torch.nn.Module):
                  in_channels=3,
                  in_size=(224, 224),
                  use_data_batchnorm=True,
-                 group_threshold=192):
+                 group_threshold=192,
+                 group_count=2,
+                 group_pw2=False):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
@@ -91,7 +97,7 @@ class CaretNet(torch.nn.Module):
             stage = torch.nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
                 stride = strides[stage_id] if unit_id == 0 else 1                
-                stage.add_module("unit{}".format(unit_id + 1), MRCFblock(in_channels=in_channels, out_channels=unit_channels, stride=stride,init_status=init_status, group_threshold=group_threshold))
+                stage.add_module("unit{}".format(unit_id + 1), MRCFblock(in_channels=in_channels, out_channels=unit_channels, stride=stride,init_status=init_status, group_threshold=group_threshold, group_count=group_count, group_pw2=group_pw2))
                 init_status = False
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
@@ -131,7 +137,7 @@ class CaretNet(torch.nn.Module):
         x = self.backbone(x)
         x = self.classifier(x)
         return x
-def build_CaretNet(num_classes, typesize=1.0, cifar=False, group_threshold=192):
+def build_CaretNet(num_classes, typesize=1.0, cifar=False, group_threshold=192, group_count=2, group_pw2=False):
     """
     Construct a CaretNet from the given set of parameters.   
     Args:
@@ -162,4 +168,6 @@ def build_CaretNet(num_classes, typesize=1.0, cifar=False, group_threshold=192):
                        channels=channels,
                        strides=strides,
                        in_size=in_size,
-                       group_threshold=group_threshold)
+                       group_threshold=group_threshold,
+                       group_count=group_count,
+                       group_pw2=group_pw2)

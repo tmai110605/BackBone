@@ -42,6 +42,10 @@ def get_args():
     #parser.add_argument('--alpha', default=0.1, type=float, help='BSConv-S weighting coefficient for the regularization loss.')
     parser.add_argument('--group-threshold', '-th', default=192, type=int,
                         help='Channel threshold to apply group convolution (e.g. 64, 128, 192, 256, 512, or 0 for baseline).')
+    parser.add_argument('--group-count', '-gc', default=2, type=int,
+                        help='Number of groups for pw convolution (e.g. 2 or 4). Default: 2.')
+    parser.add_argument('--group-pw2', '--both-pw', dest='group_pw2', action='store_true',
+                        help='Apply group convolution to both Pw1 and Pw2 when channel threshold is met.')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
     parser.add_argument('--checkpoint-path', type=str, default='', help='Path to checkpoint file for evaluation.')
@@ -189,15 +193,17 @@ def main():
 
     dataset_prefix = 'CIFAR100' if args.dataset == 'cifar100' else ('CIFAR10' if args.dataset == 'cifar10' else 'StanfordDogs')
     typesize = args.typesize
-    th_str = f"th{args.group_threshold}" if args.group_threshold > 0 else "baseline"
-    strmode = f'{dataset_prefix}_CaretNet_x{typesize}_{th_str}'
+    th_suffix = f"th{args.group_threshold}_g{args.group_count}" if args.group_threshold > 0 else "baseline"
+    if args.group_pw2 and args.group_threshold > 0:
+        th_suffix += "_bothPW"
+    strmode = f'{dataset_prefix}_CaretNet_x{typesize}_{th_suffix}'
     pathout = './checkpoints/' + strmode
     filenameLOG = pathout + '/' + strmode + '.txt'
     if not os.path.exists(pathout):
         os.makedirs(pathout)
     # get model
      
-    model = build_CaretNet(num_classes, typesize=typesize, cifar=is_cifar, group_threshold=args.group_threshold)
+    model = build_CaretNet(num_classes, typesize=typesize, cifar=is_cifar, group_threshold=args.group_threshold, group_count=args.group_count, group_pw2=args.group_pw2)
     model = model.to(device)
     
     #print(model)
@@ -218,6 +224,10 @@ def main():
     if args.evaluate:
         default_ckpt = f"./checkpoints/{strmode}/model_best.pth"
         pathcheckpoint = args.checkpoint_path if args.checkpoint_path else default_ckpt
+        if not os.path.isfile(pathcheckpoint) and not args.group_pw2:
+            legacy_ckpt = f"./checkpoints/{dataset_prefix}_CaretNet_x{typesize}_th{args.group_threshold}/model_best.pth"
+            if os.path.isfile(legacy_ckpt):
+                pathcheckpoint = legacy_ckpt
         if os.path.isfile(pathcheckpoint):
             print("=> loading checkpoint '{}'".format(pathcheckpoint))
             checkpoint = torch.load(pathcheckpoint, map_location=device)

@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Checkpoint directories (anywhere in project)
+checkpoints/
+**/checkpoints/
+**/checkpoints/**
+checkpoint/
+**/checkpoint/
+**/checkpoint/**
+
+# Model weights & checkpoints
+*.pth
+*.pt
+*.ckpt
+*.tar
+*.h5
+
+# Output folders from training (logs, temporary checkpoints)
+CIFAR100_*
+**/CIFAR100_*
+CIFAR10_*
+**/CIFAR10_*
+StanfordDogs_*
+**/StanfordDogs_*
+
+# Datasets
+data/
+**/data/
+*.zip
+*.tar.gz
+
+# Logs & Environment
+*.log
+.env
+.venv/
+env/
+venv/
+.idea/
+.vscode/
