@@ -16,7 +16,7 @@ from models.datasets import *
 from models.cross_entropy import LabelSmoothingCrossEntropy
 # from pathlib import Path
 # sys.path.append(str(Path('.').absolute().parent))
-
+import time
 from models.DenSpaNet import *
 import writeLogAcc as wA
 
@@ -82,7 +82,7 @@ def get_data_loader(args, train):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
-                
+                torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), value='random')
             ])
         else:
             transform = torchvision.transforms.Compose([
