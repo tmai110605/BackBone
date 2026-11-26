@@ -73,7 +73,7 @@ def get_data_loader(args, train):
                 torchvision.transforms.RandomCrop(32, padding=4),
                 torchvision.transforms.RandomHorizontalFlip(),
                 torchvision.transforms.ToTensor(),
-                torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), value='random')
+           
             ])
         else:
             transform = torchvision.transforms.Compose([
